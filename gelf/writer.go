@@ -13,13 +13,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"path"
 	"runtime"
 	"strings"
 	"sync"
-	"time"
 )
 
 // Writer implements io.Writer and is used to send both discrete
@@ -313,24 +313,22 @@ func (w *Writer) Write(p []byte) (n int, err error) {
 	// remove trailing and leading whitespace
 	p = bytes.TrimSpace(p)
 
-	// If there are newlines in the message, use the first line
-	// for the short message and set the full message to the
-	// original input.  If the input has no newlines, stick the
-	// whole thing in Short.
-	short := p
-	full := []byte("")
-	if i := bytes.IndexRune(p, '\n'); i > 0 {
-		short = p[:i]
-		full = p
+	msg := LogrusMessage{}
+
+	err = json.Unmarshal(p, &msg)
+	if err != nil {
+		log.Println("Could not parse log message. Do you set json formatter?", err)
 	}
+
+	level, _ := ParseLevel(msg.Level)
 
 	m := Message{
 		Version:  "1.1",
 		Host:     w.hostname,
-		Short:    string(short),
-		Full:     string(full),
-		TimeUnix: float64(time.Now().Unix()),
-		Level:    6, // info
+		Short:    msg.Message,
+		Full:     msg.Message,
+		TimeUnix: float64(msg.Time.Unix()),
+		Level:    int32(level),
 		Facility: w.Facility,
 		Extra: map[string]interface{}{
 			"_file": file,
